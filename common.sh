@@ -6,17 +6,25 @@
 [ -e $(basename $0) ] && echo "PLEASE USE THIS SCRIPT FROM ANOTHER DIR" && exit 1
 
 # Ensure that fuzzing engine, if defined, is valid
-FUZZING_ENGINE=${FUZZING_ENGINE:-"fsanitize_fuzzer"}
-POSSIBLE_FUZZING_ENGINE="libfuzzer afl honggfuzz coverage fsanitize_fuzzer hooks"
+FUZZING_ENGINE=${FUZZING_ENGINE:-"aflgo"}
+POSSIBLE_FUZZING_ENGINE="libfuzzer afl honggfuzz coverage fsanitize_fuzzer hooks aflgo"
 !(echo "$POSSIBLE_FUZZING_ENGINE" | grep -w "$FUZZING_ENGINE" > /dev/null) && \
   echo "USAGE: Error: If defined, FUZZING_ENGINE should be one of the following:
   $POSSIBLE_FUZZING_ENGINE. However, it was defined as $FUZZING_ENGINE" && exit 1
 
 SCRIPT_DIR=$(dirname $0)
 EXECUTABLE_NAME_BASE=$(basename $SCRIPT_DIR)-${FUZZING_ENGINE}
-LIBFUZZER_SRC=${LIBFUZZER_SRC:-$(dirname $(dirname $SCRIPT_DIR))/Fuzzer}
+
+# LIBFUZZER_SRC=${LIBFUZZER_SRC:-$(dirname $(dirname $SCRIPT_DIR))/Fuzzer}
+LIBFUZZER_SRC=${LIBFUZZER_SRC:-/home/radon/Documents/fuzzing/fuzzers/libfuzzer-workshop/libFuzzer/Fuzzer}
+
 STANDALONE_TARGET=0
-AFL_SRC=${AFL_SRC:-$(dirname $(dirname $SCRIPT_DIR))/AFL}
+
+# AFL_SRC=${AFL_SRC:-$(dirname $(dirname $SCRIPT_DIR))/AFL}
+AFL_SRC=${AFL_SRC:-/home/radon/Documents/fuzzing/fuzzers/afl-2.52}
+
+AFLGO_SRC=${AFLGO_SRC:-/home/radon/Documents/fuzzing/fuzzers/aflgo}
+
 HONGGFUZZ_SRC=${HONGGFUZZ_SRC:-$(dirname $(dirname $SCRIPT_DIR))/honggfuzz}
 COVERAGE_FLAGS="-O0 -fsanitize-coverage=trace-pc-guard"
 FUZZ_CXXFLAGS="-O2 -fno-omit-frame-pointer -gline-tables-only -fsanitize=address -fsanitize-address-use-after-scope -fsanitize-coverage=trace-pc-guard,trace-cmp,trace-gep,trace-div"
@@ -67,6 +75,13 @@ get_svn_revision() {
 
 build_afl() {
   $CC $CFLAGS -c -w $AFL_SRC/llvm_mode/afl-llvm-rt.o.c
+  $CXX $CXXFLAGS -std=c++11 -O2 -c ${LIBFUZZER_SRC}/afl/afl_driver.cpp -I$LIBFUZZER_SRC
+  ar r $LIB_FUZZING_ENGINE afl_driver.o afl-llvm-rt.o.o
+  rm *.o
+}
+
+build_aflgo() {
+  $CC $CFLAGS -c -w $AFLGO_SRC/llvm_mode/afl-llvm-rt.o.c
   $CXX $CXXFLAGS -std=c++11 -O2 -c ${LIBFUZZER_SRC}/afl/afl_driver.cpp -I$LIBFUZZER_SRC
   ar r $LIB_FUZZING_ENGINE afl_driver.o afl-llvm-rt.o.o
   rm *.o

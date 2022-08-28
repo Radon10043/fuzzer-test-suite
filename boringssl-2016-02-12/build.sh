@@ -10,8 +10,52 @@ build_lib() {
   (cd BUILD && cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_COMPILER="$CC" -DCMAKE_C_FLAGS="$CFLAGS -Wno-deprecated-declarations" -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_CXX_FLAGS="$CXXFLAGS -Wno-error=main" && make -j $JOBS)
 }
 
+build_lib_aflgo() {
+  rm -rf BUILD
+  cp -rf SRC BUILD
+
+  # AFLGo files
+  rm -rf temp
+  mkdir temp
+  export TMP_DIR=$PWD/temp
+  export SUBJECT=$PWD/BUILD
+  export CC=$AFLGO_SRC/afl-clang-fast
+  export CXX=$AFLGO_SRC/afl-clang-fast++
+  export CFLAGS="-targets=$TMP_DIR/BBtargets.txt -outdir=$TMP_DIR -flto -fuse-ld=gold -Wl,-plugin-opt=save-temps"
+  export CXXFLAGS="$CFLAGS"
+  echo "asn1_lib.c:459" >$TMP_DIR/BBtargets.txt
+
+  # preprocess
+  (cd BUILD && cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_COMPILER="$CC" -DCMAKE_C_FLAGS="$CFLAGS -Wno-deprecated-declarations" -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_CXX_FLAGS="$CXXFLAGS -Wno-error=main" && make -j $JOBS)
+  cat $TMP_DIR/BBnames.txt | rev | cut -d: -f2- | rev | sort | uniq >$TMP_DIR/BBnames2.txt && mv $TMP_DIR/BBnames2.txt $TMP_DIR/BBnames.txt
+  cat $TMP_DIR/BBcalls.txt | sort | uniq >$TMP_DIR/BBcalls2.txt && mv $TMP_DIR/BBcalls2.txt $TMP_DIR/BBcalls.txt
+
+  # $AFLGO_SRC/scripts/genDistance.sh $SUBJECT $TMP_DIR
+  cp /home/radon/Documents/fuzzing/google-fuzzer-test-suite/boringssl-2016-02-12/distance.cfg.txt $TMP_DIR/distance.cfg.txt
+  export CFLAGS="-distance=$TMP_DIR/distance.cfg.txt"
+  export CXXFLAGS="$CFLAGS"
+
+  # instrument
+  (cd BUILD && cmake -DBUILD_SHARED_LIBS=OFF -DCMAKE_C_COMPILER="$CC" -DCMAKE_C_FLAGS="$CFLAGS -Wno-deprecated-declarations" -DCMAKE_CXX_COMPILER="$CXX" -DCMAKE_CXX_FLAGS="$CXXFLAGS -Wno-error=main" && make -j $JOBS)
+
+  # unset variables
+  unset CC CXX CFLAGS CXXFLAGS
+}
+
+fuzz() {
+  export AFLGO=/home/radon/Documents/fuzzing/fuzzers/aflgo
+  $AFLGO/afl-fuzz -i seeds -o out -m none -z exp -c 45m -d ./boringssl-2016-02-12-aflgo @@
+}
+
 get_git_revision https://github.com/google/boringssl.git  894a47df2423f0d2b6be57e6d90f2bea88213382 SRC
-build_lib
+
+if [[ $FUZZING_ENGINE == "aflgo" ]]; then
+  build_lib_aflgo
+else
+  build_lib
+fi
+
+. $(dirname $0)/../common.sh
 build_fuzzer
 
 if [[ ! -d seeds ]]; then
