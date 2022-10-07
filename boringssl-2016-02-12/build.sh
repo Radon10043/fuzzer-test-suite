@@ -30,8 +30,7 @@ build_lib_aflgo() {
   cat $TMP_DIR/BBnames.txt | rev | cut -d: -f2- | rev | sort | uniq >$TMP_DIR/BBnames2.txt && mv $TMP_DIR/BBnames2.txt $TMP_DIR/BBnames.txt
   cat $TMP_DIR/BBcalls.txt | sort | uniq >$TMP_DIR/BBcalls2.txt && mv $TMP_DIR/BBcalls2.txt $TMP_DIR/BBcalls.txt
 
-  # $AFLGO_SRC/scripts/genDistance.sh $SUBJECT $TMP_DIR
-  cp /home/radon/Documents/fuzzing/google-fuzzer-test-suite/boringssl-2016-02-12/distance.cfg.txt $TMP_DIR/distance.cfg.txt
+  $AFLGO_SRC/scripts/genDistance.sh $SUBJECT $TMP_DIR
   export CFLAGS="-distance=$TMP_DIR/distance.cfg.txt"
   export CXXFLAGS="$CFLAGS"
 
